@@ -8,9 +8,6 @@
  *
  */
 
-//ini_set("log_errors",1);
-//ini_set("//error_log", "/tmp/beanhook.log");
-
 // This address is whatever feeds into your local copy of email-in.pl
 // Read the bugzilla docs to configure it properly.
 $BUGZILLA_EMAIL = "bugzilla@yourbugzillaserver";
@@ -82,13 +79,13 @@ function indent($string, $number = 1) {
  * Builds a header for SMTP mail based on the passed parameters.
  *
  * @param string $headerTemplate
- * @param string $authorname
- * @param string $authoremail
+ * @param string $authorName
+ * @param string $authorEmail
  * @return string
  */
 
-function buildHeader($headerTemplate, $authorname, $authoremail) {
-    return sprintf ($headerTemplate, $authorname, $authoremail);
+function buildHeader($headerTemplate, $authorName, $authorEmail) {
+    return sprintf ($headerTemplate, $authorName, $authorEmail);
 }
 
 /**
@@ -103,7 +100,7 @@ function buildHeader($headerTemplate, $authorname, $authoremail) {
  * @param string $comment
  * @param string $changes
  * @param string $url
- * @return type
+ * @return string
  */
 
 function buildMessage($msgTemplate, $bugId, $revision, $author, $comment, $changes, $url) {
@@ -122,11 +119,7 @@ function buildMessage($msgTemplate, $bugId, $revision, $author, $comment, $chang
  */
 
 function sendMessage($to, $subject, $message, $header) {
-//    $find = '/\n/';
-//    $replace = "\r\n";
-//    $msg = wordwrap(preg_replace($find, $replace, $message), 70, "\r\n");
-//    $head = preg_replace($find, $replace, $header);
-    //$msg = preg_replace("/\'/", "\'", wordwrap($message,70));
+
     $msg = wordwrap($message,70);
 
     mail($to, $subject, $msg, $header);
@@ -134,10 +127,9 @@ function sendMessage($to, $subject, $message, $header) {
 }
 if ($_REQUEST['commit'] == null) {
     // didn't get any data, log it and die.
-    //error_log("Didn't receive any commit data.");
+    error_log("Didn't receive any commit data.");
     die;
 }
-//error_log($_REQUEST['commit']);
 $data = json_decode($_REQUEST['commit'],true);
 $revision = $data['revision'];
 $comment = $data['message'];
@@ -149,14 +141,12 @@ $email = $data['author_email'];
 $name = $data['author_full_name'];
 
 // Header will be the same for all bugs
-$header = buildHeader($MSG_HEADER,$name,$email,$revision);
+$header = buildHeader($MSG_HEADER,$name,$email);
 $changes = "";
 // Process the changed files and directories into a string called changes.
-$allchanges = array_merge($changed_files,$changed_dirs);
-//error_log("All Changes: " . print_r($allchanges,true));
+$allChanges = array_merge($changed_files,$changed_dirs);
 
-foreach ($allchanges as $change) {
-    //error_log ("Checking change: " . print_r($change));
+foreach ($allChanges as $change) {
     switch ($change[1]) {
         case 'add':
             $changes .= "Added " . $change[0] . "\n";
@@ -179,20 +169,15 @@ foreach ($allchanges as $change) {
     }
 
 }
-//error_log("Changes: " . $changes);
 // Process the comments and pick out all the Comment: # and Closes: #
 $matches = array();
 if (preg_match_all('/(Comment|Closes|Close|Fixes|Resolves): #(\d+)/i',$comment,$matches)) {
-    //error_log("Matches: " . print_r($matches,true));
     foreach ($matches[1] as $index => $value) {
         $bugId = $matches[2][$index];
-        //error_log("Processing : " . $index . " - " . $value . " - " . $bugId);
         if (preg_match('/Comment/i',$value)) {
-            //error_log("Sending a comment email");
             $message = buildMessage($MSG_COMMENT_TEMPLATE, $bugId, $revision, $author, $comment, $changes, $url);
             sendMessage($BUGZILLA_EMAIL, "Bug " . $bugId, $message, $header);
         } else {
-            //error_log("Sending a close email");
             $message = buildMessage($MSG_CLOSE_TEMPLATE, $bugId, $revision, $author, $comment, $changes, $url);
             sendMessage($BUGZILLA_EMAIL, "Bug " . $bugId, $message, $header);
         }
